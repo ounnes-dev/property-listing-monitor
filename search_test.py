@@ -70,8 +70,15 @@ def collect_listings():
         "query": query
     }
 
-    response = requests.post(url, json=data)
-    result = response.json()
+    try:
+        response = requests.post(url, json=data)
+        response.raise_for_status()
+        result = response.json()
+
+    except requests.RequestException as error:
+        print("Request failed:", error)
+        return []
+
 
     announcements = result["data"]["search"]["announcements"]
 
@@ -91,8 +98,14 @@ def collect_listings():
 
         data["variables"] = variables
 
-        response = requests.post(url, json=data)
-        result = response.json()
+        try:
+            response = requests.post(url, json=data)
+            response.raise_for_status()
+            result = response.json()
+
+        except requests.RequestException as error:
+            print("Request failed on page", page, ":", error)
+            continue
 
         listings = result["data"]["search"]["announcements"]["data"]
 
@@ -100,19 +113,26 @@ def collect_listings():
 
         print("Collected page:", page, "| Listings:", len(listings))
 
+
     # Check which properties have a price vs those who don't
     priced_listings = []
 
     for listing in all_listings:
+
         if listing["price"] is not None:
             priced_listings.append(listing["price"])
+
 
     print("Listings with a price:", len(priced_listings))
     print("Listings without a price:", len(all_listings) - len(priced_listings))
 
+
     if len(priced_listings) > 0:
+
         average_price = sum(priced_listings) / len(priced_listings)
+
         print("Average price:", average_price)
+
 
     with open("listings.csv", "w", newline="", encoding="utf-8") as file:
 
@@ -148,6 +168,8 @@ def collect_listings():
                 "transaction_type": get_transaction_type(listing["title"])
             })
 
+
     print("Total listings:", len(all_listings))
 
     return all_listings
+
