@@ -1,3 +1,4 @@
 .venv/
 listings.csv
 previous_listings.csv
+events.csv
