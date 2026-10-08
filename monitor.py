@@ -1,6 +1,6 @@
 import csv
 from datetime import datetime
-from search_test import collect_listings, get_transaction_type
+from collector import collect_listings, get_transaction_type
 
 
 def log_event(event_type, listing_id, title, old_price, new_price, city):
