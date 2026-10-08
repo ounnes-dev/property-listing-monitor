@@ -104,7 +104,7 @@ def collect_listings():
     }
 
     try:
-        response = requests.post(url, json=data)
+        response = requests.post(url, json=data, timeout=10)
         response.raise_for_status()
         result = response.json()
 
@@ -134,7 +134,7 @@ def collect_listings():
         data["variables"] = variables
 
         try:
-            response = requests.post(url, json=data)
+            response = requests.post(url, json=data, timeout=10)
             response.raise_for_status()
             result = response.json()
 
