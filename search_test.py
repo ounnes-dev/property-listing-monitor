@@ -28,99 +28,126 @@ query SearchAnnouncementsQuery($q: String, $filter: SearchFilterInput) {
 }
 """
 
-all_listings = []
 
-max_pages = 5
+def get_transaction_type(title):
 
-# First request: discover how many pages exist
-page = 1
+    title = title.lower()
 
-variables = {
-    "filter": {
-        "categorySlug": None,
-        "origin": None,
-        "connected": False,
-        "delivery": None,
-        "regionIds": [],
-        "cityIds": [],
-        "page": page
-    },
-    "q": "mostaganem"
-}
+    if "vente" in title:
+        return "sale"
 
-data = {
-    "operationName": "SearchAnnouncementsQuery",
-    "variables": variables,
-    "query": query
-}
+    if "location" in title:
+        return "rent"
 
-response = requests.post(url, json=data)
-result = response.json()
+    return "unknown"
 
-announcements = result["data"]["search"]["announcements"]
 
-last_page = announcements["paginatorInfo"]["lastPage"]
+def collect_listings():
 
-print("Pages available:", last_page)
+    all_listings = []
 
-# Don't collect more than max_pages while testing
-pages_to_collect = min(last_page, max_pages)
+    max_pages = 5
 
-print("Pages we will collect:", pages_to_collect)
+    # First request: discover how many pages exist
+    page = 1
 
-# Collect the pages
-for page in range(1, pages_to_collect + 1):
+    variables = {
+        "filter": {
+            "categorySlug": None,
+            "origin": None,
+            "connected": False,
+            "delivery": None,
+            "regionIds": [],
+            "cityIds": [],
+            "page": page
+        },
+        "q": "mostaganem"
+    }
 
-    variables["filter"]["page"] = page
-
-    data["variables"] = variables
+    data = {
+        "operationName": "SearchAnnouncementsQuery",
+        "variables": variables,
+        "query": query
+    }
 
     response = requests.post(url, json=data)
     result = response.json()
 
-    listings = result["data"]["search"]["announcements"]["data"]
+    announcements = result["data"]["search"]["announcements"]
 
-    all_listings.extend(listings)
+    last_page = announcements["paginatorInfo"]["lastPage"]
 
-    print("Collected page:", page, "| Listings:", len(listings))
+    print("Pages available:", last_page)
 
-#check which properties have a price vs those who don't
-priced_listings = []
+    # Don't collect more than max_pages while testing
+    pages_to_collect = min(last_page, max_pages)
 
-for listing in all_listings:
-    if listing["price"] is not None:
-        priced_listings.append(listing["price"])
+    print("Pages we will collect:", pages_to_collect)
 
-print("Listings with a price:", len(priced_listings))
-print("Listings without a price:", len(all_listings) - len(priced_listings))
+    # Collect the pages
+    for page in range(1, pages_to_collect + 1):
 
-if len(priced_listings) > 0:
-    average_price = sum(priced_listings) / len(priced_listings)
-    print("Average price:", average_price)
+        variables["filter"]["page"] = page
 
+        data["variables"] = variables
 
-with open("listings.csv", "w", newline="", encoding="utf-8") as file:
-    writer = csv.DictWriter(
-        file,
-        fieldnames=["id", "title", "createdAt", "price", "slug", "city"]
-    )
+        response = requests.post(url, json=data)
+        result = response.json()
 
-    writer.writeheader()
+        listings = result["data"]["search"]["announcements"]["data"]
+
+        all_listings.extend(listings)
+
+        print("Collected page:", page, "| Listings:", len(listings))
+
+    # Check which properties have a price vs those who don't
+    priced_listings = []
 
     for listing in all_listings:
-        price = listing["price"]
+        if listing["price"] is not None:
+            priced_listings.append(listing["price"])
 
-        if price is not None:
-           price = float(price)
+    print("Listings with a price:", len(priced_listings))
+    print("Listings without a price:", len(all_listings) - len(priced_listings))
 
-        writer.writerow({
-            "id": listing["id"],
-            "title": listing["title"],
-            "createdAt": listing["createdAt"],
-            "price": price,
-            "slug": listing["slug"],
-            "city": listing["cities"][0]["name"]
-        })
+    if len(priced_listings) > 0:
+        average_price = sum(priced_listings) / len(priced_listings)
+        print("Average price:", average_price)
 
-print(all_listings[0])
-print("Total listings:", len(all_listings))
+    with open("listings.csv", "w", newline="", encoding="utf-8") as file:
+
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "id",
+                "title",
+                "createdAt",
+                "price",
+                "slug",
+                "city",
+                "transaction_type"
+            ]
+        )
+
+        writer.writeheader()
+
+        for listing in all_listings:
+
+            price = listing["price"]
+
+            if price is not None:
+                price = float(price)
+
+            writer.writerow({
+                "id": listing["id"],
+                "title": listing["title"],
+                "createdAt": listing["createdAt"],
+                "price": price,
+                "slug": listing["slug"],
+                "city": listing["cities"][0]["name"],
+                "transaction_type": get_transaction_type(listing["title"])
+            })
+
+    print("Total listings:", len(all_listings))
+
+    return all_listings
