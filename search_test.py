@@ -1,0 +1,126 @@
+import requests
+import csv
+
+url = "https://api.ouedkniss.com/graphql"
+
+query = """
+query SearchAnnouncementsQuery($q: String, $filter: SearchFilterInput) {
+    search(q: $q, filter: $filter) {
+        announcements {
+            data {
+                id
+                title
+                createdAt
+                price
+                slug
+                cities {
+                    id
+                    name
+                }
+            }
+
+            paginatorInfo {
+                lastPage
+                hasMorePages
+            }
+        }
+    }
+}
+"""
+
+all_listings = []
+
+max_pages = 5
+
+# First request: discover how many pages exist
+page = 1
+
+variables = {
+    "filter": {
+        "categorySlug": None,
+        "origin": None,
+        "connected": False,
+        "delivery": None,
+        "regionIds": [],
+        "cityIds": [],
+        "page": page
+    },
+    "q": "mostaganem"
+}
+
+data = {
+    "operationName": "SearchAnnouncementsQuery",
+    "variables": variables,
+    "query": query
+}
+
+response = requests.post(url, json=data)
+result = response.json()
+
+announcements = result["data"]["search"]["announcements"]
+
+last_page = announcements["paginatorInfo"]["lastPage"]
+
+print("Pages available:", last_page)
+
+# Don't collect more than max_pages while testing
+pages_to_collect = min(last_page, max_pages)
+
+print("Pages we will collect:", pages_to_collect)
+
+# Collect the pages
+for page in range(1, pages_to_collect + 1):
+
+    variables["filter"]["page"] = page
+
+    data["variables"] = variables
+
+    response = requests.post(url, json=data)
+    result = response.json()
+
+    listings = result["data"]["search"]["announcements"]["data"]
+
+    all_listings.extend(listings)
+
+    print("Collected page:", page, "| Listings:", len(listings))
+
+#check which properties have a price vs those who don't
+priced_listings = []
+
+for listing in all_listings:
+    if listing["price"] is not None:
+        priced_listings.append(listing["price"])
+
+print("Listings with a price:", len(priced_listings))
+print("Listings without a price:", len(all_listings) - len(priced_listings))
+
+if len(priced_listings) > 0:
+    average_price = sum(priced_listings) / len(priced_listings)
+    print("Average price:", average_price)
+
+
+with open("listings.csv", "w", newline="", encoding="utf-8") as file:
+    writer = csv.DictWriter(
+        file,
+        fieldnames=["id", "title", "createdAt", "price", "slug", "city"]
+    )
+
+    writer.writeheader()
+
+    for listing in all_listings:
+        price = listing["price"]
+
+        if price is not None:
+           price = float(price)
+
+        writer.writerow({
+            "id": listing["id"],
+            "title": listing["title"],
+            "createdAt": listing["createdAt"],
+            "price": price,
+            "slug": listing["slug"],
+            "city": listing["cities"][0]["name"]
+        })
+
+print(all_listings[0])
+print("Total listings:", len(all_listings))
