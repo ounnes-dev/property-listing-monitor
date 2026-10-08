@@ -103,9 +103,9 @@ property-monitor/
 |   └── Compares listing snapshots and detects changes
 |
 ├── experiments/
-|   ├── dictionary_test.py
-|   ├── graphql_test.py
-|   └── request_test.py
+|   ├── dictionary_experiment.py
+|   ├── graphql_experiment.py
+|   └── request_experiment.py
 |       └── Exploratory scripts used during development
 |
 ├── .gitignore
