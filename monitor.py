@@ -1,34 +1,20 @@
-import csv
 from datetime import datetime
+
 from collector import collect_listings, get_transaction_type
+from database import (
+    create_tables,
+    get_all_listings,
+    save_listing,
+    save_event
+)
 
 
-def log_event(event_type, listing_id, title, old_price, new_price, city):
+def normalize_price(price):
 
-    with open("events.csv", "a", newline="", encoding="utf-8") as file:
+    if price in ("", None):
+        return None
 
-        writer = csv.writer(file)
-
-        if file.tell() == 0:
-            writer.writerow([
-                "timestamp",
-                "event_type",
-                "id",
-                "title",
-                "old_price",
-                "new_price",
-                "city"
-            ])
-
-        writer.writerow([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            event_type,
-            listing_id,
-            title,
-            old_price,
-            new_price,
-            city
-        ])
+    return float(price)
 
 
 def detect_new_listings(current_listings, previous_listings):
@@ -53,14 +39,6 @@ def detect_removed_listings(current_listings, previous_listings):
             removed_listings.append(previous_listings[listing_id])
 
     return removed_listings
-
-
-def normalize_price(price):
-
-    if price in ("", None):
-        return None
-
-    return float(price)
 
 
 def detect_price_changes(current_listings, previous_listings):
@@ -91,46 +69,49 @@ def detect_price_changes(current_listings, previous_listings):
     return price_changes
 
 
+create_tables()
+
 listings = collect_listings()
 
-listings_by_id = {}
+current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+current_by_id = {}
 
 for listing in listings:
 
     listing_id = listing["id"]
-    listings_by_id[listing_id] = listing
+
+    current_by_id[listing_id] = {
+        "id": listing["id"],
+        "title": listing["title"],
+        "created_at": listing["createdAt"],
+        "price": normalize_price(listing["price"]),
+        "slug": listing["slug"],
+        "city": listing["cities"][0]["name"],
+        "transaction_type": get_transaction_type(
+            listing["title"]
+        ),
+        "last_seen": current_time
+    }
 
 
-try:
-
-    with open("previous_listings.csv", "r", encoding="utf-8") as file:
-
-        reader = csv.DictReader(file)
-        previous_listings = list(reader)
-
-except FileNotFoundError:
-
-    print()
-    print("No previous snapshot found.")
-    print("This is the first monitoring run.")
-
-    previous_listings = []
-
+previous_listings = get_all_listings()
 
 previous_by_id = {}
 
 for listing in previous_listings:
 
     listing_id = listing["id"]
+
     previous_by_id[listing_id] = listing
 
 
-print("Current listings:", len(listings_by_id))
+print("Current listings:", len(current_by_id))
 print("Previous listings:", len(previous_by_id))
 
 
 new_listings = detect_new_listings(
-    listings_by_id,
+    current_by_id,
     previous_by_id
 )
 
@@ -141,24 +122,22 @@ for listing in new_listings:
     print("ID:", listing["id"])
     print("Title:", listing["title"])
     print("Price:", listing["price"])
-    print("City:", listing["cities"][0]["name"])
-    print(
-        "Transaction type:",
-        get_transaction_type(listing["title"])
-    )
+    print("City:", listing["city"])
+    print("Transaction type:", listing["transaction_type"])
 
-    log_event(
+    save_event(
         "NEW",
         listing["id"],
         listing["title"],
-        "",
+        None,
         listing["price"],
-        listing["cities"][0]["name"]
+        listing["city"],
+        current_time
     )
 
 
 removed_listings = detect_removed_listings(
-    listings_by_id,
+    current_by_id,
     previous_by_id
 )
 
@@ -170,23 +149,21 @@ for listing in removed_listings:
     print("Title:", listing["title"])
     print("Last known price:", listing["price"])
     print("City:", listing["city"])
-    print(
-        "Transaction type:",
-        listing.get("transaction_type", "unknown")
-    )
+    print("Transaction type:", listing["transaction_type"])
 
-    log_event(
+    save_event(
         "REMOVED",
         listing["id"],
         listing["title"],
         listing["price"],
-        "",
-        listing["city"]
+        None,
+        listing["city"],
+        current_time
     )
 
 
 price_changes = detect_price_changes(
-    listings_by_id,
+    current_by_id,
     previous_by_id
 )
 
@@ -200,53 +177,23 @@ for change in price_changes:
     print("Title:", listing["title"])
     print("Old price:", change["old_price"])
     print("New price:", change["new_price"])
-    print("City:", listing["cities"][0]["name"])
+    print("City:", listing["city"])
 
-    log_event(
+    save_event(
         "PRICE_CHANGED",
         listing["id"],
         listing["title"],
         change["old_price"],
         change["new_price"],
-        listing["cities"][0]["name"]
+        listing["city"],
+        current_time
     )
 
 
-with open(
-    "previous_listings.csv",
-    "w",
-    newline="",
-    encoding="utf-8"
-) as file:
+for listing in current_by_id.values():
 
-    writer = csv.DictWriter(
-        file,
-        fieldnames=[
-            "id",
-            "title",
-            "createdAt",
-            "price",
-            "slug",
-            "city",
-            "transaction_type"
-        ]
-    )
-
-    writer.writeheader()
-
-    for listing in listings:
-
-        writer.writerow({
-            "id": listing["id"],
-            "title": listing["title"],
-            "createdAt": listing["createdAt"],
-            "price": listing["price"],
-            "slug": listing["slug"],
-            "city": listing["cities"][0]["name"],
-            "transaction_type": get_transaction_type(
-                listing["title"]
-            )
-        })
+    save_listing(listing)
 
 
-print("Previous snapshot updated.")
+print()
+print("Database updated.")

@@ -22,40 +22,32 @@ The system collects property data through Ouedkniss' public GraphQL endpoint, st
 * Use request timeouts to prevent indefinitely hanging requests
 * Run the monitoring process automatically using Windows Task Scheduler
 
-## Architecture
-
-```text
-                    Ouedkniss
-                        |
-                        v
-                  GraphQL API
-                        |
-                        v
-                  collector.py
-                        |
-                        v
-                Current listings
-                        |
-                        v
-                   monitor.py
-                        |
-             +----------+----------+
-             |          |          |
-             v          v          v
-            NEW      REMOVED   PRICE CHANGED
-             |          |          |
-             +----------+----------+
-                        |
-                        v
-                   events.csv
-
-
-             previous_listings.csv
-              (historical snapshot)
-                        |
-                        |
-                        +-----> monitor.py
-```
+             Ouedkniss
+                 │
+                 ▼
+          GraphQL API
+                 │
+                 ▼
+          ┌─────────────┐
+          │ collector.py│
+          └──────┬──────┘
+                 │
+                 ▼
+        Current Listings
+                 │
+                 ▼
+          ┌─────────────┐
+          │ monitor.py  │◄──── previous_listings.csv
+          └──────┬──────┘
+                 │
+        ┌────────┼────────┐
+        ▼        ▼        ▼
+      NEW     REMOVED   PRICE
+                         CHANGE
+        │        │        │
+        └────────┼────────┘
+                 ▼
+             events.csv
 
 ## Data Collected
 
