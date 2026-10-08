@@ -42,6 +42,39 @@ def get_transaction_type(title):
     return "unknown"
 
 
+def get_announcements(result):
+
+    if "errors" in result:
+
+        print("API returned an error:")
+        print(result["errors"])
+
+        return None
+
+    if "data" not in result:
+        print("Unexpected API response.")
+        return None
+
+    if result["data"] is None:
+        print("API returned no data.")
+        return None
+
+    if "search" not in result["data"]:
+        print("Search data missing from API response.")
+        return None
+
+    if result["data"]["search"] is None:
+        print("Search returned no results.")
+        return None
+
+    if "announcements" not in result["data"]["search"]:
+        print("Announcements data missing from API response.")
+        return None
+
+    return result["data"]["search"]["announcements"]
+
+
+
 def collect_listings():
 
     all_listings = []
@@ -80,13 +113,15 @@ def collect_listings():
         return []
 
 
-    announcements = result["data"]["search"]["announcements"]
+    announcements = get_announcements(result)
+
+    if announcements is None:
+        return []
 
     last_page = announcements["paginatorInfo"]["lastPage"]
 
     print("Pages available:", last_page)
 
-    # Don't collect more than max_pages while testing
     pages_to_collect = min(last_page, max_pages)
 
     print("Pages we will collect:", pages_to_collect)
@@ -107,7 +142,13 @@ def collect_listings():
             print("Request failed on page", page, ":", error)
             continue
 
-        listings = result["data"]["search"]["announcements"]["data"]
+        announcements = get_announcements(result)
+
+        if announcements is None:
+            print("Skipping Page", page)
+            continue
+
+        listings = announcements["data"]
 
         all_listings.extend(listings)
 
