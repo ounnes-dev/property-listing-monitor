@@ -1,27 +1,39 @@
-
 # Property Listing Intelligence
 
-A Python project that collects property listings from Ouedkniss, stores them in SQLite, detects listing and price changes, and provides a dashboard for exploring the results.
+A Python-based property listing monitoring system that collects real estate listings from Ouedkniss, stores them in SQLite, detects new listings and price changes, and presents the results through an interactive web dashboard.
+
+The project demonstrates practical skills in data collection, database management, change detection, API development, analytics, and automated testing.
+
+## Dashboard Preview
+
+
+![Property Listing Intelligence dashboard](screenshots/dashboard.png)
+
+*The dashboard provides a browser-based interface for exploring collected property listings and monitoring results.*
 
 ## Features
 
-- Collects property listings using the Ouedkniss GraphQL API.
-- Stores listing information in a local SQLite database.
-- Detects new listings and price changes.
-- Tracks prices becoming available or unavailable.
-- Records monitoring events for individual listings.
-- Provides a FastAPI backend and browser-based dashboard.
-- Includes market analytics and automated tests.
+- **Live data collection:** Retrieve property listings using the Ouedkniss GraphQL API.
+- **SQLite persistence:** Store collected listings and monitoring events locally.
+- **New listing detection:** Identify listings that were not present in the existing database records.
+- **Price change detection:** Detect price changes and prices becoming available or unavailable.
+- **Event logging:** Record detected changes with timestamps and listing details.
+- **Web dashboard:** Explore project data through a browser-based interface.
+- **REST API:** Serve application functionality through FastAPI.
+- **Market analytics:** Analyze collected property listing data.
+- **Automated testing:** Validate key functionality with pytest.
 
 ## Tech Stack
 
-- Python
-- Requests
-- SQLite
-- FastAPI
-- Uvicorn
-- Pytest
-- HTML, CSS, and JavaScript
+| Technology | Purpose |
+|---|---|
+| Python | Application logic and data processing |
+| Requests | HTTP requests to the Ouedkniss API |
+| SQLite | Local database storage |
+| FastAPI | API and web application backend |
+| Uvicorn | Local application server |
+| HTML, CSS, JavaScript | Dashboard interface |
+| Pytest | Automated testing |
 
 ## Project Structure
 
@@ -38,16 +50,23 @@ property-monitor/
 ├── test_database.py
 ├── test_analytics.py
 ├── requirements.txt
+├── screenshots/
+│   └── dashboard.png
 └── README.md
 ```
 
 ## Getting Started
 
+### Prerequisites
+
+- Python 3.10 or newer, subject to dependency compatibility.
+- An internet connection for collecting live listings.
+
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/ounnes-dev/property-listing-monitor
-cd property-monitor
+git clone https://github.com/ounnes-dev/property-listing-monitor.git
+cd property-listing-monitor
 ```
 
 ### 2. Create a virtual environment
@@ -56,7 +75,7 @@ cd property-monitor
 python -m venv .venv
 ```
 
-Activate it on Windows:
+Activate it on Windows PowerShell:
 
 ```powershell
 .venv\Scripts\Activate.ps1
@@ -65,34 +84,33 @@ Activate it on Windows:
 ### 3. Install dependencies
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-### 4. Start the API and dashboard
+### 4. Start the dashboard and API
 
 ```bash
 python -m uvicorn app:app --reload --port 8001
 ```
 
-Open the dashboard:
+Open the following URLs in your browser:
 
-http://127.0.0.1:8001/dashboard
+- **Dashboard:** http://127.0.0.1:8001/dashboard
+- **Interactive API documentation:** http://127.0.0.1:8001/docs
 
-Interactive API documentation:
-
-http://127.0.0.1:8001/docs
+Keep this terminal running while using the dashboard.
 
 ### 5. Run the monitoring process
 
-In a separate terminal with the virtual environment activated:
+Open a second terminal, activate the virtual environment, and run:
 
-```bash
+```powershell
 python monitor.py
 ```
 
-The monitoring process collects listings, compares them with the stored data, records detected events, and updates the database.
+The monitoring process collects listings, compares them with existing database records, records detected events, and saves the current results.
 
-Collection can be limited using the `PROPERTY_MONITOR_MAX_PAGES` environment variable.
+By default, the collector checks a limited number of pages. You can configure this using the `PROPERTY_MONITOR_MAX_PAGES` environment variable.
 
 PowerShell example:
 
@@ -101,24 +119,45 @@ $env:PROPERTY_MONITOR_MAX_PAGES = "3"
 python monitor.py
 ```
 
-### 6. Run the tests
+The number of listings collected depends on the number of results returned by the source.
 
-```bash
+**Note:** Listings missing from a limited collection are not automatically classified as removed. A listing may simply be outside the pages collected during that run.
+
+### 6. Run the automated tests
+
+```powershell
 pytest -q
 ```
 
 ## Data Storage
 
-Listing information and monitoring events are stored in a local SQLite database. The database file is generated when the application initializes.
+The application uses a local SQLite database to store property listings and monitoring events. Database tables are initialized by the application, and the database file is generated locally.
+
+The database and other generated data files are not required to clone the source code and should generally remain outside version control.
 
 ## Project Goals
 
-This project explores practical data collection, data persistence, change detection, API development, analytics, and automated testing.
+This project was built to explore practical applications of:
+
+- Collecting data from an external API.
+- Normalizing and processing real-world data.
+- Persisting records in a relational database.
+- Detecting changes between successive data collections.
+- Developing a backend and browser-based dashboard.
+- Analyzing property listing data.
+- Testing application behavior and failure cases.
 
 ## Future Improvements
 
 - Scheduled monitoring.
-- More advanced property-market analytics.
 - Configurable cities and property categories.
+- More advanced property-market analytics.
 - Historical price trend visualizations.
 - Notifications for significant listing changes.
+- Deployment to a hosted environment.
+
+## Author
+
+**Barae Ounnes**
+
+[GitHub](https://github.com/ounnes-dev)
