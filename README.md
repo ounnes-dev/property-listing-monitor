@@ -1,211 +1,124 @@
-# Property Listing Intelligence & Monitoring System
 
-A Python-based system for collecting publicly available property listings from Ouedkniss and monitoring changes in those listings over time.
+# Property Listing Intelligence
 
-The system collects property data through Ouedkniss' public GraphQL endpoint, stores historical snapshots, compares current listings with previous runs, and records newly added, removed, or price-changed listings.
+A Python project that collects property listings from Ouedkniss, stores them in SQLite, detects listing and price changes, and provides a dashboard for exploring the results.
 
 ## Features
 
-* Collect property listings through a GraphQL API
-* Search and paginate through multiple result pages
-* Extract structured listing information
-* Classify listings as sale or rental based on their titles
-* Store collected listings in CSV format
-* Maintain a previous snapshot for historical comparison
-* Detect:
+- Collects property listings using the Ouedkniss GraphQL API.
+- Stores listing information in a local SQLite database.
+- Detects new listings and price changes.
+- Tracks prices becoming available or unavailable.
+- Records monitoring events for individual listings.
+- Provides a FastAPI backend and browser-based dashboard.
+- Includes market analytics and automated tests.
 
-  * New listings
-  * Removed listings
-  * Price changes
-* Record detected events with timestamps
-* Handle HTTP and API-level errors
-* Use request timeouts to prevent indefinitely hanging requests
-* Run the monitoring process automatically using Windows Task Scheduler
+## Tech Stack
 
-             Ouedkniss
-                 │
-                 ▼
-          GraphQL API
-                 │
-                 ▼
-          ┌─────────────┐
-          │ collector.py│
-          └──────┬──────┘
-                 │
-                 ▼
-        Current Listings
-                 │
-                 ▼
-          ┌─────────────┐
-          │ monitor.py  │◄──── previous_listings.csv
-          └──────┬──────┘
-                 │
-        ┌────────┼────────┐
-        ▼        ▼        ▼
-      NEW     REMOVED   PRICE
-                         CHANGE
-        │        │        │
-        └────────┼────────┘
-                 ▼
-             events.csv
-
-## Data Collected
-
-For each listing, the system currently collects:
-
-| Field              | Description                     |
-| ------------------ | ------------------------------- |
-| `id`               | Unique listing identifier       |
-| `title`            | Original listing title          |
-| `createdAt`        | Timestamp returned by the API   |
-| `price`            | Price value returned by the API |
-| `slug`             | Listing slug                    |
-| `city`             | Listing city                    |
-| `transaction_type` | Sale, rent, or unknown          |
-
-The original listing title and raw price value are preserved rather than attempting to guess or reinterpret seller-specific pricing conventions.
-
-## Change Detection
-
-The monitoring system uses the listing ID as the stable identifier when comparing snapshots.
-
-### New Listings
-
-A listing is considered new when its ID appears in the current collection but not in the previous snapshot.
-
-### Removed Listings
-
-A listing is considered removed when its ID appears in the previous snapshot but not in the current collection.
-
-### Price Changes
-
-A price change is detected when the same listing exists in both snapshots but its numeric price differs.
-
-Detected events are stored in `events.csv` with a timestamp and relevant listing information.
+- Python
+- Requests
+- SQLite
+- FastAPI
+- Uvicorn
+- Pytest
+- HTML, CSS, and JavaScript
 
 ## Project Structure
 
 ```text
 property-monitor/
-|
+├── app.py
 ├── collector.py
-|   └── Collects and processes property listings
-|
 ├── monitor.py
-|   └── Compares listing snapshots and detects changes
-|
-├── experiments/
-|   ├── dictionary_experiment.py
-|   ├── graphql_experiment.py
-|   └── request_experiment.py
-|       └── Exploratory scripts used during development
-|
-├── .gitignore
+├── database.py
+├── analytics.py
+├── test_collector.py
+├── test_monitor.py
+├── test_monitor_safety.py
+├── test_database.py
+├── test_analytics.py
+├── requirements.txt
 └── README.md
 ```
 
-The following files are generated locally and excluded from version control:
+## Getting Started
 
-```text
-listings.csv
-previous_listings.csv
-events.csv
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/ounnes-dev/property-listing-monitor
+cd property-monitor
 ```
 
-## Requirements
-
-* Python 3
-* `requests`
-* Internet connection
-* Access to the Ouedkniss public GraphQL endpoint
-
-## Installation
-
-Clone the repository and create a virtual environment:
+### 2. Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-Activate the virtual environment on Windows:
+Activate it on Windows:
 
 ```powershell
 .venv\Scripts\Activate.ps1
 ```
 
-Install the required package:
+### 3. Install dependencies
 
-```powershell
-pip install requests
+```bash
+pip install -r requirements.txt
 ```
 
-## Running the Monitor
+### 4. Start the API and dashboard
 
-Run the monitoring system with:
+```bash
+python -m uvicorn app:app --reload --port 8001
+```
 
-```powershell
+Open the dashboard:
+
+http://127.0.0.1:8001/dashboard
+
+Interactive API documentation:
+
+http://127.0.0.1:8001/docs
+
+### 5. Run the monitoring process
+
+In a separate terminal with the virtual environment activated:
+
+```bash
 python monitor.py
 ```
 
-The system will:
+The monitoring process collects listings, compares them with the stored data, records detected events, and updates the database.
 
-1. Collect the current property listings.
-2. Compare them with the previous snapshot.
-3. Detect new, removed, and price-changed listings.
-4. Record detected events.
-5. Save the current collection as the new snapshot.
+Collection can be limited using the `PROPERTY_MONITOR_MAX_PAGES` environment variable.
 
-The collector is currently limited to a small number of pages during development to avoid unnecessary requests to the website.
+PowerShell example:
 
-## Automation
+```powershell
+$env:PROPERTY_MONITOR_MAX_PAGES = "3"
+python monitor.py
+```
 
-The monitoring script can be executed automatically using Windows Task Scheduler.
+### 6. Run the tests
 
-This allows the system to periodically collect new data without requiring manual execution.
+```bash
+pytest -q
+```
 
-## Design Considerations
+## Data Storage
 
-### Public Data
+Listing information and monitoring events are stored in a local SQLite database. The database file is generated when the application initializes.
 
-The project uses publicly accessible property listing information and does not attempt to bypass authentication, CAPTCHAs, paywalls, or other access controls.
+## Project Goals
 
-### Raw Data Preservation
-
-The system does not attempt to infer the meaning of unusual seller-entered price values. The raw value returned by the API is preserved.
-
-### Stable Identifiers
-
-Listing IDs are used instead of titles as the primary identifier because titles can change while the listing itself remains the same.
-
-### API Validation
-
-The collector validates the structure of API responses before processing them and handles HTTP request failures without crashing the entire collection process.
-
-## Current Limitations
-
-* Currently focused on Ouedkniss.
-* Monitoring is limited to a small number of pages during development.
-* Data is stored in CSV files rather than a database.
-* Notifications are not yet implemented.
-* No web dashboard is currently included.
+This project explores practical data collection, data persistence, change detection, API development, analytics, and automated testing.
 
 ## Future Improvements
 
-Possible future improvements include:
-
-* Persistent database storage
-* Monitoring additional property sources
-* More advanced property filtering
-* Historical price analysis
-* Automated notifications
-* Data visualization
-* A web-based monitoring dashboard
-
-## Technologies
-
-* Python
-* Requests
-* GraphQL
-* CSV
-* Git / GitHub
-* Windows Task Scheduler
+- Scheduled monitoring.
+- More advanced property-market analytics.
+- Configurable cities and property categories.
+- Historical price trend visualizations.
+- Notifications for significant listing changes.

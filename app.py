@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
@@ -6,13 +7,11 @@ from database import (
     get_listing_by_id,
     get_events_for_listing,
 )
-
-from analytics import calculate_price_change
-
 from analytics import (
     calculate_price_change,
     calculate_market_analytics,
 )
+
 
 app = FastAPI(
     title="Property Listing Intelligence API",
@@ -73,10 +72,12 @@ def listing_events(listing_id: str):
 
     return events
 
+
 @app.get("/analytics/market")
 def market_analytics():
     listings = get_all_listings()
     return calculate_market_analytics(listings)
+
 
 # -------------------------
 # WEB DASHBOARD
@@ -90,7 +91,6 @@ def dashboard():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
         <title>Property Intelligence Dashboard</title>
 
         <style>
@@ -120,8 +120,7 @@ def dashboard():
 
             .stats {
                 display: grid;
-                grid-template-columns:
-                    repeat(auto-fit, minmax(170px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
                 gap: 16px;
                 margin-bottom: 24px;
             }
@@ -252,6 +251,11 @@ def dashboard():
             .event p {
                 color: #687386;
                 overflow-wrap: anywhere;
+                line-height: 1.5;
+            }
+
+            .event-title {
+                font-weight: bold;
             }
 
             .price-analysis {
@@ -280,7 +284,6 @@ def dashboard():
     <body>
         <header>
             <h1>Property Intelligence</h1>
-
             <div class="subtitle">
                 Monitor listings and explore the property market.
             </div>
@@ -321,9 +324,7 @@ def dashboard():
                     <option value="unknown">Unknown</option>
                 </select>
 
-                <button id="refresh" type="button">
-                    Refresh data
-                </button>
+                <button id="refresh" type="button">Refresh data</button>
             </div>
 
             <div id="message" role="status">Loading listings...</div>
@@ -340,7 +341,6 @@ def dashboard():
                             <th>History</th>
                         </tr>
                     </thead>
-
                     <tbody id="listings"></tbody>
                 </table>
             </div>
@@ -359,22 +359,18 @@ def dashboard():
                         <option value="NEW">New listings</option>
                         <option value="REMOVED">Removed listings</option>
                         <option value="PRICE_CHANGED">Price changes</option>
+                        <option value="PRICE_MISSING">Price missing</option>
+                        <option value="PRICE_ADDED">Price added</option>
                     </select>
 
-                    <span id="eventCount" aria-live="polite">
-                        0 events
-                    </span>
+                    <span id="eventCount" aria-live="polite">0 events</span>
                 </div>
 
                 <div id="eventHistory">
                     Select a listing to view its history.
                 </div>
 
-                <button
-                    id="closeDetails"
-                    class="close-button"
-                    type="button"
-                >
+                <button id="closeDetails" class="close-button" type="button">
                     Close details
                 </button>
             </div>
@@ -392,11 +388,7 @@ def dashboard():
             }
 
             function formatPrice(price) {
-                if (
-                    price === null ||
-                    price === undefined ||
-                    price === ""
-                ) {
+                if (price === null || price === undefined || price === "") {
                     return "Not available";
                 }
 
@@ -407,34 +399,37 @@ def dashboard():
                     : String(price);
             }
 
+            function formatEventType(eventType) {
+                const labels = {
+                    NEW: "New listing",
+                    REMOVED: "Listing removed",
+                    PRICE_CHANGED: "Price changed",
+                    PRICE_MISSING: "Price no longer available",
+                    PRICE_ADDED: "Price added"
+                };
+
+                return labels[eventType] || String(eventType || "Event")
+                    .replaceAll("_", " ");
+            }
+
             function renderListings() {
                 const query = document
                     .getElementById("search")
                     .value.trim()
                     .toLowerCase();
 
-                const selectedType =
-                    document.getElementById("type").value;
+                const selectedType = document.getElementById("type").value;
 
                 const filtered = allListings.filter(listing => {
-                    const title = String(
-                        listing.title || ""
-                    ).toLowerCase();
-
-                    const city = String(
-                        listing.city || ""
-                    ).toLowerCase();
-
-                    const transaction =
-                        listing.transaction_type || "unknown";
+                    const title = String(listing.title || "").toLowerCase();
+                    const city = String(listing.city || "").toLowerCase();
+                    const transaction = listing.transaction_type || "unknown";
 
                     const matchesSearch =
-                        title.includes(query) ||
-                        city.includes(query);
+                        title.includes(query) || city.includes(query);
 
                     const matchesType =
-                        selectedType === "all" ||
-                        transaction === selectedType;
+                        selectedType === "all" || transaction === selectedType;
 
                     return matchesSearch && matchesType;
                 });
@@ -448,33 +443,24 @@ def dashboard():
                     addCell(row, listing.title || "Untitled");
                     addCell(row, listing.city || "Unknown");
 
-                    const transaction =
-                        listing.transaction_type || "unknown";
-
+                    const transaction = listing.transaction_type || "unknown";
                     const transactionLabel =
-                        transaction === "sale"
-                            ? "For sale"
-                            : transaction === "rent"
-                                ? "For rent"
-                                : "Unknown";
+                        transaction === "sale" ? "For sale" :
+                        transaction === "rent" ? "For rent" : "Unknown";
 
                     addCell(row, transactionLabel);
                     addCell(row, formatPrice(listing.price));
 
                     const statusCell = addCell(row, "");
                     const badge = document.createElement("span");
-
                     badge.className = "status";
                     badge.textContent = "Active";
                     statusCell.appendChild(badge);
 
                     const historyCell = addCell(row, "");
-                    const detailsButton =
-                        document.createElement("button");
-
+                    const detailsButton = document.createElement("button");
                     detailsButton.type = "button";
                     detailsButton.textContent = "View history";
-
                     detailsButton.addEventListener("click", () => {
                         showDetails(listing.id);
                     });
@@ -484,43 +470,30 @@ def dashboard():
                 }
 
                 document.getElementById("message").textContent =
-                    `Showing ${filtered.length} of ` +
-                    `${allListings.length} listings.`;
+                    `Showing ${filtered.length} of ${allListings.length} listings.`;
             }
 
             function renderEventHistory() {
-                const history =
-                    document.getElementById("eventHistory");
+                const history = document.getElementById("eventHistory");
+                const eventCount = document.getElementById("eventCount");
+                const selectedFilter = document.getElementById("eventFilter").value;
 
-                const eventCount =
-                    document.getElementById("eventCount");
-
-                const selectedFilter =
-                    document.getElementById("eventFilter").value;
-
-                const filteredEvents = currentEvents.filter(event => {
-                    return (
-                        selectedFilter === "ALL" ||
-                        event.event_type === selectedFilter
-                    );
-                });
+                const filteredEvents = currentEvents.filter(event =>
+                    selectedFilter === "ALL" ||
+                    event.event_type === selectedFilter
+                );
 
                 eventCount.textContent =
-                    `${filteredEvents.length} ` +
-                    `${filteredEvents.length === 1 ? "event" : "events"}`;
+                    `${filteredEvents.length} ${filteredEvents.length === 1 ? "event" : "events"}`;
 
                 history.replaceChildren();
 
                 if (filteredEvents.length === 0) {
-                    const emptyMessage =
-                        document.createElement("p");
-
+                    const emptyMessage = document.createElement("p");
                     emptyMessage.className = "empty-history";
-
-                    emptyMessage.textContent =
-                        currentEvents.length === 0
-                            ? "No monitoring events recorded yet."
-                            : "No events match this filter.";
+                    emptyMessage.textContent = currentEvents.length === 0
+                        ? "No monitoring events recorded yet."
+                        : "No events match this filter.";
 
                     history.appendChild(emptyMessage);
                     return;
@@ -530,29 +503,28 @@ def dashboard():
                     const item = document.createElement("div");
                     item.className = "event";
 
-                    const heading =
-                        document.createElement("strong");
+                    const heading = document.createElement("div");
+                    heading.className = "event-title";
+                    heading.textContent = formatEventType(event.event_type);
 
-                    heading.textContent =
-                        (event.event_type || "EVENT")
-                            .replaceAll("_", " ");
+                    const property = document.createElement("p");
+                    const eventListingId =
+                        event.listing_id ?? event.id ?? "Unknown";
 
-                    const description =
-                        document.createElement("p");
+                    property.textContent =
+                        `Property: ${event.title || "Unknown property"} (ID: ${eventListingId})`;
 
+                    const description = document.createElement("p");
                     description.textContent =
                         `Date: ${event.timestamp || "Unknown"} | ` +
                         `Old price: ${formatPrice(event.old_price)} | ` +
                         `New price: ${formatPrice(event.new_price)}`;
 
-                    item.append(heading, description);
+                    item.append(heading, property, description);
 
                     if (event.event_type === "PRICE_CHANGED") {
                         const analytics = event.price_change;
-
-                        const analysisLine =
-                            document.createElement("p");
-
+                        const analysisLine = document.createElement("p");
                         analysisLine.className = "price-analysis";
 
                         if (analytics) {
@@ -566,8 +538,7 @@ def dashboard():
                                     : `${analytics.percentage_change.toFixed(2)}%`;
 
                             analysisLine.textContent =
-                                `Price ${analytics.direction} by ` +
-                                `${amount} (${percentage})`;
+                                `Price ${analytics.direction} by ${amount} (${percentage})`;
                         } else {
                             analysisLine.textContent =
                                 "Price-change analytics unavailable.";
@@ -581,28 +552,18 @@ def dashboard():
             }
 
             async function showDetails(listingId) {
-                const panel =
-                    document.getElementById("listingDetails");
-
-                const title =
-                    document.getElementById("detailTitle");
-
-                const info =
-                    document.getElementById("detailInfo");
-
-                const history =
-                    document.getElementById("eventHistory");
+                const panel = document.getElementById("listingDetails");
+                const title = document.getElementById("detailTitle");
+                const info = document.getElementById("detailInfo");
+                const history = document.getElementById("eventHistory");
 
                 panel.hidden = false;
                 title.textContent = "Loading property...";
                 info.textContent = "";
                 history.textContent = "Loading event history...";
-
                 currentEvents = [];
 
-                document.getElementById("eventCount").textContent =
-                    "0 events";
-
+                document.getElementById("eventCount").textContent = "0 events";
                 document.getElementById("eventFilter").value = "ALL";
 
                 panel.scrollIntoView({
@@ -611,29 +572,21 @@ def dashboard():
                 });
 
                 try {
-                    const encodedId =
-                        encodeURIComponent(listingId);
+                    const encodedId = encodeURIComponent(listingId);
 
-                    const [listingResponse, eventsResponse] =
-                        await Promise.all([
-                            fetch(`/listings/${encodedId}`),
-                            fetch(`/listings/${encodedId}/events`)
-                        ]);
+                    const [listingResponse, eventsResponse] = await Promise.all([
+                        fetch(`/listings/${encodedId}`),
+                        fetch(`/listings/${encodedId}/events`)
+                    ]);
 
-                    if (
-                        !listingResponse.ok ||
-                        !eventsResponse.ok
-                    ) {
-                        throw new Error(
-                            "Could not retrieve property details."
-                        );
+                    if (!listingResponse.ok || !eventsResponse.ok) {
+                        throw new Error("Could not retrieve property details.");
                     }
 
                     const listing = await listingResponse.json();
                     const events = await eventsResponse.json();
 
-                    title.textContent =
-                        listing.title || "Untitled property";
+                    title.textContent = listing.title || "Untitled property";
 
                     info.textContent =
                         `ID: ${listing.id} | ` +
@@ -643,17 +596,22 @@ def dashboard():
 
                     currentEvents = Array.isArray(events) ? events : [];
 
+                    // The selected listing supplies reliable title and ID
+                    // even if an event response omits those fields.
+                    currentEvents = currentEvents.map(event => ({
+                        ...event,
+                        title: event.title || listing.title,
+                        listing_id: event.listing_id || listing.id
+                    }));
+
                     renderEventHistory();
                 } catch (error) {
                     title.textContent = "Could not load property";
                     info.textContent = error.message;
-
                     currentEvents = [];
-                    document.getElementById("eventCount").textContent =
-                        "0 events";
 
-                    history.textContent =
-                        "Check the API and try again.";
+                    document.getElementById("eventCount").textContent = "0 events";
+                    history.textContent = "Check the API and try again.";
 
                     console.error(error);
                 }
@@ -661,9 +619,7 @@ def dashboard():
 
             async function loadListings() {
                 const message = document.getElementById("message");
-
-                const refreshButton =
-                    document.getElementById("refresh");
+                const refreshButton = document.getElementById("refresh");
 
                 refreshButton.disabled = true;
                 message.textContent = "Loading listings...";
@@ -672,17 +628,13 @@ def dashboard():
                     const response = await fetch("/listings");
 
                     if (!response.ok) {
-                        throw new Error(
-                            "The API returned an error."
-                        );
+                        throw new Error("The API returned an error.");
                     }
 
                     const data = await response.json();
 
                     if (!Array.isArray(data)) {
-                        throw new Error(
-                            "Unexpected API response."
-                        );
+                        throw new Error("Unexpected API response.");
                     }
 
                     allListings = data;
@@ -699,16 +651,13 @@ def dashboard():
 
                     document.getElementById("cities").textContent =
                         new Set(
-                            allListings
-                                .map(item => item.city)
-                                .filter(Boolean)
+                            allListings.map(item => item.city).filter(Boolean)
                         ).size;
 
                     renderListings();
                 } catch (error) {
                     message.textContent =
-                        "Could not load listings. " +
-                        "Check that the API is running.";
+                        "Could not load listings. Check that the API is running.";
 
                     console.error(error);
                 } finally {
@@ -730,9 +679,7 @@ def dashboard():
 
             document.getElementById("closeDetails")
                 .addEventListener("click", () => {
-                    document.getElementById(
-                        "listingDetails"
-                    ).hidden = true;
+                    document.getElementById("listingDetails").hidden = true;
                 });
 
             loadListings();

@@ -203,3 +203,22 @@ def test_detect_price_added_event():
     assert events[0]["event_type"] == "PRICE_ADDED"
     assert events[0]["old_price"] is None
     assert events[0]["new_price"] == 5_000_000
+
+
+def test_detect_new_listings_does_not_repeat_existing_listing():
+    listing = {
+        "id": "123",
+        "title": "Villa in Mostaganem",
+        "price": 5_000_000,
+    }
+
+    current_listings = {"123": listing}
+    previous_listings = {"123": listing.copy()}
+
+    result = detect_new_listings(
+        current_listings,
+        previous_listings,
+    )
+
+    assert result == []
+
