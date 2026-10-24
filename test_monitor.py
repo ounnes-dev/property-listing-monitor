@@ -153,3 +153,53 @@ def test_detect_missing_price_change():
     assert len(price_changes) == 1
     assert price_changes[0]["old_price"] == 5000000
     assert price_changes[0]["new_price"] is None
+
+
+def test_detect_missing_price_event():
+    current = {
+        "1": {
+            "id": "1",
+            "title": "Villa",
+            "price": None,
+        }
+    }
+
+    previous = {
+        "1": {
+            "id": "1",
+            "title": "Villa",
+            "price": 5_000_000,
+        }
+    }
+
+    events = detect_price_changes(current, previous)
+
+    assert len(events) == 1
+    assert events[0]["event_type"] == "PRICE_MISSING"
+    assert events[0]["old_price"] == 5_000_000
+    assert events[0]["new_price"] is None
+
+
+def test_detect_price_added_event():
+    current = {
+        "1": {
+            "id": "1",
+            "title": "Villa",
+            "price": 5_000_000,
+        }
+    }
+
+    previous = {
+        "1": {
+            "id": "1",
+            "title": "Villa",
+            "price": None,
+        }
+    }
+
+    events = detect_price_changes(current, previous)
+
+    assert len(events) == 1
+    assert events[0]["event_type"] == "PRICE_ADDED"
+    assert events[0]["old_price"] is None
+    assert events[0]["new_price"] == 5_000_000

@@ -41,8 +41,9 @@ def detect_removed_listings(current_listings, previous_listings):
 
 
 
+
 def detect_price_changes(current_listings, previous_listings):
-    changes = []
+    events = []
 
     for listing_id, current in current_listings.items():
         if listing_id not in previous_listings:
@@ -53,21 +54,27 @@ def detect_price_changes(current_listings, previous_listings):
         old_price = normalize_price(previous.get("price"))
         new_price = normalize_price(current.get("price"))
 
-        # Ignore records where both prices are missing.
+        # Both prices are unknown: nothing useful to report.
         if old_price is None and new_price is None:
             continue
 
-        # Report a change if either price is missing or the values differ.
-        if old_price != new_price:
-            changes.append({
-                "listing": current,
-                "old_price": old_price,
-                "new_price": new_price,
-            })
+        if old_price is not None and new_price is None:
+            event_type = "PRICE_MISSING"
+        elif old_price is None and new_price is not None:
+            event_type = "PRICE_ADDED"
+        elif old_price != new_price:
+            event_type = "PRICE_CHANGED"
+        else:
+            continue
 
-    return changes
+        events.append({
+            "event_type": event_type,
+            "listing": current,
+            "old_price": old_price,
+            "new_price": new_price,
+        })
 
-
+    return events
 
 def prepare_listing(listing):
     """Prepare a listing for the database."""
@@ -170,9 +177,10 @@ def main():
 
     for change in price_changes:
         listing = change["listing"]
+        event_type = event["event_type"]
 
         print()
-        print("PRICE CHANGED")
+        print(event_type)
         print("ID:", listing["id"])
         print("Title:", listing["title"])
         print("Old price:", change["old_price"])
@@ -180,7 +188,7 @@ def main():
         print("City:", listing["city"])
 
         save_event(
-            "PRICE_CHANGED",
+            event_type,
             listing["id"],
             listing["title"],
             change["old_price"],
