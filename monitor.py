@@ -71,7 +71,10 @@ def detect_price_changes(current_listings, previous_listings):
 
 create_tables()
 
-listings = collect_listings()
+try:
+    listings = collect_listings()
+except RuntimeError as error:
+    raise SystemExit(f"ERROR: {error}")
 
 if not listings:
     raise SystemExit(

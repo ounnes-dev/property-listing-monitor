@@ -109,14 +109,18 @@ def collect_listings():
         result = response.json()
 
     except requests.RequestException as error:
-        print("Request failed:", error)
-        return []
+        raise RuntimeError(
+             "Collection failed on the initial request."
+        ) from error
+        
 
 
     announcements = get_announcements(result)
 
     if announcements is None:
-        return []
+        raise RuntimeError(
+            "Collection failed: invalid initial API response."
+        )
 
     last_page = announcements["paginatorInfo"]["lastPage"]
 
@@ -139,14 +143,16 @@ def collect_listings():
             result = response.json()
 
         except requests.RequestException as error:
-            print("Request failed on page", page, ":", error)
-            continue
+            raise RuntimeError(
+                f"Collection failed on page {page}."
+            )from error
 
         announcements = get_announcements(result)
 
         if announcements is None:
-            print("Skipping Page", page)
-            continue
+            raise RuntimeError(
+                f"Collection failed: invalid API response on page {page}."
+            )
 
         listings = announcements["data"]
 
