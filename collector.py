@@ -1,4 +1,3 @@
-
 import csv
 import time
 
@@ -10,15 +9,21 @@ API_URL = "https://api.ouedkniss.com/graphql"
 HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
-    "User-Agent": "Mozilla/5.0",
+    "Origin": "https://www.ouedkniss.com",
+    "Referer": "https://www.ouedkniss.com/",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    ),
 }
 
 PAGE_SIZE = 10
 REQUEST_TIMEOUT = 20
 
 QUERY = """
-query SearchAnnouncementsQuery($filter: SearchAnnouncementsFilterInput, $page: Int, $limit: Int) {
-    search: searchAnnouncements(filter: $filter, page: $page, limit: $limit) {
+query SearchQuery($q: String, $filter: SearchFilterInput) {
+    search(q: $q, filter: $filter) {
         announcements {
             data {
                 id
@@ -73,13 +78,15 @@ def get_transaction_type(title):
 
 
 def _extract_search_result(response_json):
-    """Validate and extract the search result from the API response."""
+    """Validate and extract listings and pagination from GraphQL JSON."""
     if not isinstance(response_json, dict):
-        raise RuntimeError("The API returned an invalid response.")
+        raise RuntimeError(
+            "The API returned an invalid JSON response."
+        )
 
     if response_json.get("errors"):
         raise RuntimeError(
-            f"GraphQL error: {response_json['errors']}"
+            f"GraphQL errors: {response_json['errors']}"
         )
 
     data = response_json.get("data") or {}
@@ -87,48 +94,87 @@ def _extract_search_result(response_json):
     announcements = search.get("announcements") or {}
 
     if not isinstance(announcements, dict):
-        raise RuntimeError("Unexpected announcements response format.")
+        raise RuntimeError(
+            "Unexpected announcements response format."
+        )
 
     listings = announcements.get("data")
     pagination = announcements.get("paginatorInfo")
 
     if not isinstance(listings, list):
-        raise RuntimeError("The API response did not contain a listings list.")
+        raise RuntimeError(
+            "The API response did not contain a listings list."
+        )
 
     if not isinstance(pagination, dict):
-        raise RuntimeError("The API response did not contain pagination information.")
+        raise RuntimeError(
+            "The API response did not contain pagination information."
+        )
 
     return listings, pagination
 
 
 def _request_page(page):
-    """Request one page and fail explicitly if the request is unsuccessful."""
+    """Request a page and report HTTP, network, or GraphQL errors."""
     variables = {
+        "q": "mostaganem",
         "filter": {
             "categorySlug": "immobilier",
-            "query": "mostaganem",
+            "origin": None,
+            "connected": False,
+            "delivery": None,
+            "regionIds": [],
+            "cityIds": [],
+            "priceRange": [None, None],
+            "exchange": None,
+            "hasPictures": False,
+            "hasPrice": False,
+            "priceUnit": None,
+            "fields": [],
+            "page": page,
+            "orderByField": {
+                "field": "REFRESHED_AT"
+            },
+            "count": PAGE_SIZE,
         },
-        "page": page,
-        "limit": PAGE_SIZE,
+    }
+
+    payload = {
+        "operationName": "SearchQuery",
+        "query": QUERY,
+        "variables": variables,
     }
 
     try:
         response = requests.post(
             API_URL,
             headers=HEADERS,
-            json={
-                "operationName": "SearchAnnouncementsQuery",
-                "query": QUERY,
-                "variables": variables,
-            },
+            json=payload,
             timeout=REQUEST_TIMEOUT,
         )
-        response.raise_for_status()
-        response_json = response.json()
-
-    except (requests.RequestException, ValueError) as error:
+    except requests.RequestException as error:
         raise RuntimeError(
-            f"Failed to collect page {page}: {error}"
+            f"Network error while collecting page {page}: {error}"
+        ) from error
+
+    status_code = getattr(response, "status_code", 200)
+
+    if status_code >= 400:
+        response_body = getattr(response, "text", "")[:3000]
+
+        raise RuntimeError(
+            f"HTTP {status_code} while collecting page {page}.\n"
+            f"Response body: {response_body}"
+        )
+
+    try:
+        response_json = response.json()
+    except (ValueError, requests.exceptions.JSONDecodeError) as error:
+        response_body = getattr(response, "text", "")[:1000]
+
+        raise RuntimeError(
+            f"Page {page}: the API returned invalid JSON.\n"
+            f"Response body: {response_body}"
         ) from error
 
     try:
@@ -140,7 +186,7 @@ def _request_page(page):
 
 
 def _normalise_listing(listing):
-    """Convert an API listing into the format used by the project."""
+    """Convert an API listing to the format used by the project."""
     if not isinstance(listing, dict) or listing.get("id") is None:
         return None
 
@@ -148,7 +194,7 @@ def _normalise_listing(listing):
     city = ""
 
     if cities and isinstance(cities[0], dict):
-        city = cities[0].get("name", "")
+        city = cities[0].get("name") or ""
 
     price = listing.get("price")
 
@@ -174,31 +220,41 @@ def collect_listings(max_pages=None, delay_seconds=0.5):
     Collect property listings from Ouedkniss.
 
     max_pages=None collects all pages reported by the API.
-    Set max_pages to a positive integer for a limited test run.
+    A positive integer limits the number of pages collected.
 
-    If any page fails, raise RuntimeError instead of returning
-    an incomplete result that could be mistaken for a full collection.
+    If a request or response fails, raise RuntimeError instead of
+    returning partial data as if collection had succeeded.
     """
     if max_pages is not None and (
         not isinstance(max_pages, int)
         or isinstance(max_pages, bool)
         or max_pages < 1
     ):
-        raise ValueError("max_pages must be a positive integer or None.")
+        raise ValueError(
+            "max_pages must be a positive integer or None."
+        )
 
     if delay_seconds < 0:
-        raise ValueError("delay_seconds cannot be negative.")
+        raise ValueError(
+            "delay_seconds cannot be negative."
+        )
 
     # Initial request obtains pagination information.
+    # Page 1 is fetched again in the collection loop to preserve
+    # compatibility with the existing collection tests.
     _, pagination = _request_page(1)
 
     try:
         last_page = int(pagination.get("lastPage", 1))
     except (TypeError, ValueError) as error:
-        raise RuntimeError("The API returned an invalid lastPage value.") from error
+        raise RuntimeError(
+            "The API returned an invalid lastPage value."
+        ) from error
 
     if last_page < 1:
-        raise RuntimeError("The API returned an invalid page count.")
+        raise RuntimeError(
+            "The API returned an invalid page count."
+        )
 
     pages_to_collect = (
         min(last_page, max_pages)
@@ -228,19 +284,27 @@ def collect_listings(max_pages=None, delay_seconds=0.5):
 
     listings = list(listings_by_id.values())
 
-    # Save only after every requested page has been collected successfully.
-    with open("listings.csv", "w", newline="", encoding="utf-8") as file:
-        fieldnames = [
-            "id",
-            "title",
-            "createdAt",
-            "price",
-            "slug",
-            "city",
-            "transaction_type",
-        ]
+    # Save only after all requested pages have succeeded.
+    fieldnames = [
+        "id",
+        "title",
+        "createdAt",
+        "price",
+        "slug",
+        "city",
+        "transaction_type",
+    ]
 
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
+    with open(
+        "listings.csv",
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=fieldnames,
+        )
         writer.writeheader()
 
         for listing in listings:
@@ -254,7 +318,9 @@ def collect_listings(max_pages=None, delay_seconds=0.5):
                 "transaction_type": listing["transaction_type"],
             })
 
-    print(f"Collection complete. Unique listings: {len(listings)}")
+    print(
+        f"Collection complete. Unique listings: {len(listings)}"
+    )
 
     return listings
 
