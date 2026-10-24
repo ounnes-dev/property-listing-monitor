@@ -9,6 +9,7 @@ from database import (
     save_event,
 )
 
+import os
 
 def normalize_price(price):
     """Convert a price to a number, or None when it is missing."""
@@ -95,7 +96,8 @@ def main():
     create_tables()
 
     try:
-        listings = collect_listings()
+        max_pages = int(os.getenv("PROPERTY_MONITOR_MAX_PAGES", "3"))
+        listings = collect_listings(max_pages=max_pages) 
     except RuntimeError as error:
         raise SystemExit(f"ERROR: {error}") from error
 

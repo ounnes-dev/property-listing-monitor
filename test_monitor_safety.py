@@ -8,7 +8,7 @@ def test_monitor_stops_when_collection_returns_no_listings(tmp_path):
     project_folder = tmp_path
 
     (project_folder / "collector.py").write_text(
-        "def collect_listings():\n"
+        "def collect_listings(max_pages=None):\n"
         "    return []\n"
         "\n"
         "def get_transaction_type(title):\n"
