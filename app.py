@@ -215,6 +215,27 @@ def dashboard():
                 margin-top: 24px;
             }
 
+            .history-controls {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 12px;
+                margin: 16px 0;
+            }
+
+            .history-controls label {
+                font-weight: 600;
+            }
+
+            .history-controls select {
+                max-width: 100%;
+            }
+
+            #eventCount {
+                color: #687386;
+                font-size: 14px;
+            }
+
             .event {
                 padding: 12px 0;
                 border-bottom: 1px solid #edf0f5;
@@ -227,6 +248,11 @@ def dashboard():
 
             .price-analysis {
                 font-weight: bold;
+            }
+
+            .empty-history {
+                color: #687386;
+                padding: 12px 0;
             }
 
             .close-button {
@@ -317,6 +343,21 @@ def dashboard():
 
                 <h3>Monitoring history</h3>
 
+                <div class="history-controls">
+                    <label for="eventFilter">Filter events:</label>
+
+                    <select id="eventFilter">
+                        <option value="ALL">All events</option>
+                        <option value="NEW">New listings</option>
+                        <option value="REMOVED">Removed listings</option>
+                        <option value="PRICE_CHANGED">Price changes</option>
+                    </select>
+
+                    <span id="eventCount" aria-live="polite">
+                        0 events
+                    </span>
+                </div>
+
                 <div id="eventHistory">
                     Select a listing to view its history.
                 </div>
@@ -333,6 +374,7 @@ def dashboard():
 
         <script>
             let allListings = [];
+            let currentEvents = [];
 
             function addCell(row, value) {
                 const cell = document.createElement("td");
@@ -438,6 +480,98 @@ def dashboard():
                     `${allListings.length} listings.`;
             }
 
+            function renderEventHistory() {
+                const history =
+                    document.getElementById("eventHistory");
+
+                const eventCount =
+                    document.getElementById("eventCount");
+
+                const selectedFilter =
+                    document.getElementById("eventFilter").value;
+
+                const filteredEvents = currentEvents.filter(event => {
+                    return (
+                        selectedFilter === "ALL" ||
+                        event.event_type === selectedFilter
+                    );
+                });
+
+                eventCount.textContent =
+                    `${filteredEvents.length} ` +
+                    `${filteredEvents.length === 1 ? "event" : "events"}`;
+
+                history.replaceChildren();
+
+                if (filteredEvents.length === 0) {
+                    const emptyMessage =
+                        document.createElement("p");
+
+                    emptyMessage.className = "empty-history";
+
+                    emptyMessage.textContent =
+                        currentEvents.length === 0
+                            ? "No monitoring events recorded yet."
+                            : "No events match this filter.";
+
+                    history.appendChild(emptyMessage);
+                    return;
+                }
+
+                for (const event of filteredEvents) {
+                    const item = document.createElement("div");
+                    item.className = "event";
+
+                    const heading =
+                        document.createElement("strong");
+
+                    heading.textContent =
+                        (event.event_type || "EVENT")
+                            .replaceAll("_", " ");
+
+                    const description =
+                        document.createElement("p");
+
+                    description.textContent =
+                        `Date: ${event.timestamp || "Unknown"} | ` +
+                        `Old price: ${formatPrice(event.old_price)} | ` +
+                        `New price: ${formatPrice(event.new_price)}`;
+
+                    item.append(heading, description);
+
+                    if (event.event_type === "PRICE_CHANGED") {
+                        const analytics = event.price_change;
+
+                        const analysisLine =
+                            document.createElement("p");
+
+                        analysisLine.className = "price-analysis";
+
+                        if (analytics) {
+                            const amount = formatPrice(
+                                Math.abs(analytics.difference)
+                            );
+
+                            const percentage =
+                                analytics.percentage_change === null
+                                    ? "undefined (old price was zero)"
+                                    : `${analytics.percentage_change.toFixed(2)}%`;
+
+                            analysisLine.textContent =
+                                `Price ${analytics.direction} by ` +
+                                `${amount} (${percentage})`;
+                        } else {
+                            analysisLine.textContent =
+                                "Price-change analytics unavailable.";
+                        }
+
+                        item.appendChild(analysisLine);
+                    }
+
+                    history.appendChild(item);
+                }
+            }
+
             async function showDetails(listingId) {
                 const panel =
                     document.getElementById("listingDetails");
@@ -455,6 +589,13 @@ def dashboard():
                 title.textContent = "Loading property...";
                 info.textContent = "";
                 history.textContent = "Loading event history...";
+
+                currentEvents = [];
+
+                document.getElementById("eventCount").textContent =
+                    "0 events";
+
+                document.getElementById("eventFilter").value = "ALL";
 
                 panel.scrollIntoView({
                     behavior: "smooth",
@@ -489,75 +630,20 @@ def dashboard():
                     info.textContent =
                         `ID: ${listing.id} | ` +
                         `City: ${listing.city || "Unknown"} | ` +
-                        `Transaction: ${
-                            listing.transaction_type || "Unknown"
-                        } | ` +
+                        `Transaction: ${listing.transaction_type || "Unknown"} | ` +
                         `Price: ${formatPrice(listing.price)}`;
 
-                    history.replaceChildren();
+                    currentEvents = Array.isArray(events) ? events : [];
 
-                    if (!Array.isArray(events) || events.length === 0) {
-                        history.textContent =
-                            "No monitoring events recorded yet.";
-                        return;
-                    }
-
-                    for (const event of events) {
-                        const item = document.createElement("div");
-                        item.className = "event";
-
-                        const heading =
-                            document.createElement("strong");
-
-                        heading.textContent =
-                            (event.event_type || "EVENT")
-                                .replaceAll("_", " ");
-
-                        const description =
-                            document.createElement("p");
-
-                        description.textContent =
-                            `Date: ${event.timestamp || "Unknown"} | ` +
-                            `Old price: ${formatPrice(event.old_price)} | ` +
-                            `New price: ${formatPrice(event.new_price)}`;
-
-                        item.append(heading, description);
-
-                        if (event.event_type === "PRICE_CHANGED") {
-                            const analytics = event.price_change;
-                            const analysisLine =
-                                document.createElement("p");
-
-                            analysisLine.className = "price-analysis";
-
-                            if (analytics) {
-                                const amount = formatPrice(
-                                    Math.abs(analytics.difference)
-                                );
-
-                                const percentage =
-                                    analytics.percentage_change === null
-                                        ? "undefined (old price was zero)"
-                                        : `${
-                                            analytics.percentage_change
-                                        .toFixed(2)}%`;
-
-                                analysisLine.textContent =
-                                    `Price ${analytics.direction} by ` +
-                                    `${amount} (${percentage})`;
-                            } else {
-                                analysisLine.textContent =
-                                    "Price-change analytics unavailable.";
-                            }
-
-                            item.appendChild(analysisLine);
-                        }
-
-                        history.appendChild(item);
-                    }
+                    renderEventHistory();
                 } catch (error) {
                     title.textContent = "Could not load property";
                     info.textContent = error.message;
+
+                    currentEvents = [];
+                    document.getElementById("eventCount").textContent =
+                        "0 events";
+
                     history.textContent =
                         "Check the API and try again.";
 
@@ -567,6 +653,7 @@ def dashboard():
 
             async function loadListings() {
                 const message = document.getElementById("message");
+
                 const refreshButton =
                     document.getElementById("refresh");
 
@@ -629,6 +716,9 @@ def dashboard():
 
             document.getElementById("refresh")
                 .addEventListener("click", loadListings);
+
+            document.getElementById("eventFilter")
+                .addEventListener("change", renderEventHistory);
 
             document.getElementById("closeDetails")
                 .addEventListener("click", () => {
