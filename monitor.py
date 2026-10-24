@@ -73,6 +73,12 @@ create_tables()
 
 listings = collect_listings()
 
+if not listings:
+    raise SystemExit(
+        "ERROR: No listings were collected. "
+        "Monitoring stopped to prevent false removal events."
+    )
+
 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 current_by_id = {}
