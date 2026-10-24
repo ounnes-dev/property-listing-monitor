@@ -43,13 +43,13 @@ def create_tables():
     connection.commit()
     connection.close()
 
+
 def save_listing(listing):
     connection = get_connection()
-
     cursor = connection.cursor()
 
     cursor.execute("""
-        INSERT OR REPLACE INTO listings (
+        INSERT INTO listings (
             id,
             title,
             created_at,
@@ -60,6 +60,14 @@ def save_listing(listing):
             last_seen
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            created_at = excluded.created_at,
+            price = excluded.price,
+            slug = excluded.slug,
+            city = excluded.city,
+            transaction_type = excluded.transaction_type,
+            last_seen = excluded.last_seen
     """, (
         listing["id"],
         listing["title"],
@@ -73,6 +81,7 @@ def save_listing(listing):
 
     connection.commit()
     connection.close()
+
 
 def get_all_listings():
 

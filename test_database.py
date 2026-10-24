@@ -86,3 +86,32 @@ def test_save_and_retrieve_event(monkeypatch, tmp_path):
     assert events[0]["listing_id"] == "TEST123"
     assert events[0]["new_price"] == 25000000
     assert events[0]["old_price"] is None
+
+def test_save_listing_updates_existing_record(monkeypatch, tmp_path):
+    setup_test_database(monkeypatch, tmp_path)
+
+    listing = {
+        "id": "TEST123",
+        "title": "Vente Villa Mostaganem",
+        "created_at": "2026-10-24",
+        "price": 25000000,
+        "slug": "vente-villa-mostaganem",
+        "city": "Mostaganem",
+        "transaction_type": "sale",
+        "last_seen": "2026-10-24 13:00:00"
+    }
+
+    database.save_listing(listing)
+
+    listing["price"] = 23000000
+    listing["last_seen"] = "2026-10-24 14:00:00"
+
+    database.save_listing(listing)
+
+    result = database.get_listing_by_id("TEST123")
+
+    assert result["price"] == 23000000
+    assert result["last_seen"] == "2026-10-24 14:00:00"
+
+    all_listings = database.get_all_listings()
+    assert len(all_listings) == 1
