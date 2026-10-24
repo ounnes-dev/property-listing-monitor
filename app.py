@@ -9,6 +9,10 @@ from database import (
 
 from analytics import calculate_price_change
 
+from analytics import (
+    calculate_price_change,
+    calculate_market_analytics,
+)
 
 app = FastAPI(
     title="Property Listing Intelligence API",
@@ -69,6 +73,10 @@ def listing_events(listing_id: str):
 
     return events
 
+@app.get("/analytics/market")
+def market_analytics():
+    listings = get_all_listings()
+    return calculate_market_analytics(listings)
 
 # -------------------------
 # WEB DASHBOARD
