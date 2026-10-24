@@ -1,13 +1,14 @@
 from datetime import datetime
 
 from collector import collect_listings, get_transaction_type
+
 from database import (
     create_tables,
     get_all_listings,
     save_listing,
-    save_event
+    save_event,
+    mark_listing_inactive
 )
-
 
 def normalize_price(price):
 
@@ -169,6 +170,8 @@ for listing in removed_listings:
         listing["city"],
         current_time
     )
+
+    mark_listing_inactive(listing["id"])
 
 
 price_changes = detect_price_changes(

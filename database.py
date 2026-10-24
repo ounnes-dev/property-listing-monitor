@@ -11,7 +11,6 @@ def get_connection():
 def create_tables():
 
     connection = get_connection()
-
     cursor = connection.cursor()
 
     cursor.execute("""
@@ -23,7 +22,8 @@ def create_tables():
             slug TEXT,
             city TEXT,
             transaction_type TEXT,
-            last_seen TEXT NOT NULL
+            last_seen TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1
         )
     """)
 
@@ -40,11 +40,22 @@ def create_tables():
         )
     """)
 
+    # Migration for existing databases
+    cursor.execute("PRAGMA table_info(listings)")
+    columns = [row[1] for row in cursor.fetchall()]
+
+    if "is_active" not in columns:
+        cursor.execute("""
+            ALTER TABLE listings
+            ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1
+        """)
+
     connection.commit()
     connection.close()
 
 
 def save_listing(listing):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -57,9 +68,10 @@ def save_listing(listing):
             slug,
             city,
             transaction_type,
-            last_seen
+            last_seen,
+            is_active
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
         ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             created_at = excluded.created_at,
@@ -67,7 +79,8 @@ def save_listing(listing):
             slug = excluded.slug,
             city = excluded.city,
             transaction_type = excluded.transaction_type,
-            last_seen = excluded.last_seen
+            last_seen = excluded.last_seen,
+            is_active = 1
     """, (
         listing["id"],
         listing["title"],
@@ -83,15 +96,32 @@ def save_listing(listing):
     connection.close()
 
 
+def mark_listing_inactive(listing_id):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        UPDATE listings
+        SET is_active = 0
+        WHERE id = ?
+    """, (listing_id,))
+
+    connection.commit()
+    connection.close()
+
+
 def get_all_listings():
 
     connection = get_connection()
-
     connection.row_factory = sqlite3.Row
-
     cursor = connection.cursor()
 
-    cursor.execute("SELECT * FROM listings")
+    cursor.execute("""
+        SELECT *
+        FROM listings
+        WHERE is_active = 1
+    """)
 
     rows = cursor.fetchall()
 
@@ -99,7 +129,9 @@ def get_all_listings():
 
     return [dict(row) for row in rows]
 
+
 def get_listing_by_id(listing_id):
+
     connection = get_connection()
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
@@ -118,7 +150,9 @@ def get_listing_by_id(listing_id):
 
     return dict(row)
 
+
 def save_event(event_type, listing_id, title, old_price, new_price, city, timestamp):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -146,18 +180,45 @@ def save_event(event_type, listing_id, title, old_price, new_price, city, timest
     connection.commit()
     connection.close()
 
+
 def get_events():
+
     connection = get_connection()
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
 
-    cursor.execute("SELECT * FROM events ORDER BY timestamp")
+    cursor.execute("""
+        SELECT *
+        FROM events
+        ORDER BY timestamp
+    """)
 
     rows = cursor.fetchall()
 
     connection.close()
 
-    return [dict(row) for row in rows]    
+    return [dict(row) for row in rows]
+
+
+def get_events_for_listing(listing_id):
+
+    connection = get_connection()
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM events
+        WHERE listing_id = ?
+        ORDER BY timestamp DESC, id DESC
+    """, (listing_id,))
+
+    rows = cursor.fetchall()
+
+    connection.close()
+
+    return [dict(row) for row in rows]
+
 
 if __name__ == "__main__":
     create_tables()

@@ -1,4 +1,5 @@
 
+import pathlib
 import subprocess
 import sys
 
@@ -26,14 +27,16 @@ def test_monitor_stops_when_collection_returns_no_listings(tmp_path):
         "    raise AssertionError('Listings should not be saved')\n"
         "\n"
         "def save_event(*args):\n"
-        "    raise AssertionError('Events should not be saved')\n",
+        "    raise AssertionError('Events should not be saved')\n"
+        "\n"
+        "def mark_listing_inactive(*args):\n"
+        "    raise AssertionError('Listings should not be marked inactive')\n",
         encoding="utf-8"
     )
 
     # Copy the actual monitor.py into the isolated test folder.
     import monitor
 
-    import pathlib
     source_file = pathlib.Path(monitor.__file__)
 
     (project_folder / "monitor.py").write_text(
